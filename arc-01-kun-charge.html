@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>坤 · 牛 ☷ 厚德射覆</title>
+    <style>
+        /* 全局硬边风格 */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: #0a080c;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Georgia', 'Times New Roman', serif;
+            color: #b8a08a;
+            padding: 20px;
+        }
+        .container {
+            background: #0a080c;
+            border-radius: 0; /* 完全直角 */
+            padding: 8px;
+            border: 1px solid #1e1620;
+        }
+        canvas {
+            display: block;
+            width: 900px;
+            height: 640px;
+            border-radius: 0; /* 直角，与UI呼应 */
+            background: #080612;
+            cursor: crosshair;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <canvas id="canvas" width="900" height="640"></canvas>
+    </div>
+    <script>
+        // ================================================================
+        //  1. 画布与上下文
+        // ================================================================
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const W = 900,
+            H = 640;
+
+        // ================================================================
+        //  2. 全局配置（低饱和，克制）
+        // ================================================================
+        const CONFIG = {
+            baseDamage: 10,
+            rate: 1.08,
+            maxChargeTime: 120,
+            bulletSpeed: 8,
+            targetCount: 5,
+        };
+
+        // ================================================================
+        //  3. 角色：坤 · 牛 ☷（矢量绘制——定稿，严禁修改）
+        // ================================================================
+        const player = {
+            x: 450,
+            y: 320,
+            scale: 1,
+            glow: 0, // 蓄力亮度，0~1
+
+            draw: function(ctx) {
+                // ---------- 本段代码已定稿，禁止任何修改 ----------
+                ctx.save();
+                ctx.translate(this.x, this.y);
+
+                // ========== 1. 主体躯干 + 四肢（加宽底座，重心下沉） ==========
+                ctx.beginPath();
+                ctx.moveTo(-26, -12);
+                ctx.lineTo(-34, 4);
+                ctx.lineTo(-30, 46);
+                ctx.lineTo(-22, 46);
+                ctx.lineTo(-24, 10);
+                ctx.lineTo(-18, 14);
+                ctx.lineTo(-44, 98);
+                ctx.lineTo(-30, 98);
+                ctx.lineTo(-26, 62);
+                ctx.lineTo(26, 62);
+                ctx.lineTo(30, 98);
+                ctx.lineTo(44, 98);
+                ctx.lineTo(18, 14);
+                ctx.lineTo(24, 10);
+                ctx.lineTo(22, 46);
+                ctx.lineTo(30, 46);
+                ctx.lineTo(34, 4);
+                ctx.lineTo(26, -12);
+                ctx.closePath();
+
+                ctx.fillStyle = "#0F0D1A";
+                ctx.fill();
+                ctx.strokeStyle = "#422660";
+                ctx.lineWidth = 2.2;
+                ctx.stroke();
+
+                // ========== 2. 牛首（适度放大，比例协调） ==========
+                ctx.save();
+                ctx.translate(0, -12);
+                ctx.beginPath();
+                ctx.moveTo(-22, -56);
+                ctx.bezierCurveTo(-28, -42, -26, -22, -18, -14);
+                ctx.bezierCurveTo(0, -8, 18, -14, 26, -22);
+                ctx.bezierCurveTo(28, -42, 22, -56, 0, -60);
+                ctx.bezierCurveTo(-22, -58, -22, -56, -22, -56);
+                ctx.closePath();
+                ctx.fillStyle = "#0F0D1A";
+                ctx.fill();
+                ctx.strokeStyle = "#422660";
+                ctx.lineWidth = 2.2;
+                ctx.stroke();
+
+                // 牛角｜短粗、向内下沉收敛，不上翘
+                ctx.beginPath();
+                ctx.moveTo(-18, -50);
+                ctx.bezierCurveTo(-32, -44, -30, -32, -22, -26);
+                ctx.moveTo(18, -50);
+                ctx.bezierCurveTo(32, -44, 30, -32, 22, -26);
+                ctx.lineWidth = 1.6;
+                ctx.strokeStyle = "#705488";
+                ctx.stroke();
+
+                // 眼部｜拉长细暗缝，看得见但不抢戏
+                ctx.beginPath();
+                ctx.moveTo(-10, -34);
+                ctx.lineTo(-4, -32);
+                ctx.moveTo(10, -34);
+                ctx.lineTo(4, -32);
+                ctx.lineWidth = 1.4;
+                ctx.strokeStyle = "#422660";
+                ctx.stroke();
+                ctx.restore();
+
+                // ========== 3. 胸口三阴爻 ⚋⚋⚋ 随蓄力glow线性亮起 ==========
+                ctx.save();
+                const yaoBaseY = 16;
+                const yaoW = 18;
+                const yaoGap = 7;
+                const yaoAlpha = 0.15 + this.glow * 0.85;
+                ctx.strokeStyle = `rgba(66, 38, 96, ${yaoAlpha})`;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(-yaoW / 2, yaoBaseY);
+                ctx.lineTo(yaoW / 2, yaoBaseY);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(-yaoW / 2, yaoBaseY + yaoGap);
+                ctx.lineTo(yaoW / 2, yaoBaseY + yaoGap);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(-yaoW / 2, yaoBaseY + yaoGap * 2);
+                ctx.lineTo(yaoW / 2, yaoBaseY + yaoGap * 2);
+                ctx.stroke();
+                ctx.restore();
+
+                // ========== 4. 蓄力外轮廓光晕（随glow渐变，向内收敛质感） ==========
+                if (this.glow > 0) {
+                    ctx.save();
+                    ctx.shadowColor = "#422660";
+                    ctx.shadowBlur = 1 + this.glow * 12;
+                    ctx.beginPath();
+                    ctx.moveTo(-26, -12);
+                    ctx.lineTo(-34, 4);
+                    ctx.lineTo(-30, 46);
+                    ctx.lineTo(-22, 46);
+                    ctx.lineTo(-24, 10);
+                    ctx.lineTo(-18, 14);
+                    ctx.lineTo(-44, 98);
+                    ctx.lineTo(-30, 98);
+                    ctx.lineTo(-26, 62);
+                    ctx.lineTo(26, 62);
+                    ctx.lineTo(30, 98);
+                    ctx.lineTo(44, 98);
+                    ctx.lineTo(18, 14);
+                    ctx.lineTo(24, 10);
+                    ctx.lineTo(22, 46);
+                    ctx.lineTo(30, 46);
+                    ctx.lineTo(34, 4);
+                    ctx.lineTo(26, -12);
+                    ctx.closePath();
+                    ctx.strokeStyle = `rgba(66, 38, 96, ${this.glow * 0.45})`;
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+                    ctx.restore();
+                }
+
+                ctx.restore();
+                // ---------- 角色绘制代码结束 ----------
+            }
+        };
+
+        // ================================================================
+        //  4. 粒子系统（低饱和，克制）
+        // ================================================================
+        class Particle {
+            constructor(x, y) {
+                this.x = x || Math.random() * W;
+                this.y = y || Math.random() * H;
+                this.radius = 1.2 + Math.random() * 2.2;
+                this.speed = 0.04 + Math.random() * 0.06;
+                // 仅使用低饱和紫金灰
+                const palettes = [
+                    `rgba(66,38,96,${0.3+Math.random()*0.4})`,
+                    `rgba(112,84,136,${0.2+Math.random()*0.3})`,
+                    `rgba(90,74,74,${0.2+Math.random()*0.3})`,
+                ];
+                this.color = palettes[Math.floor(Math.random() * palettes.length)];
+                this.active = true;
+                this.vx = 0;
+                this.vy = 0;
+                this.life = 0;
+                this.phase = 'idle';
+            }
+
+            converge(cx, cy) {
+                const dx = cx - this.x,
+                    dy = cy - this.y;
+                const dist = Math.hypot(dx, dy);
+                if (dist < 2) {
+                    this.x = cx + (Math.random() - 0.5) * 4;
+                    this.y = cy + (Math.random() - 0.5) * 4;
+                    return;
+                }
+                const step = Math.min(this.speed * 2.5, dist);
+                this.x += (dx / dist) * step;
+                this.y += (dy / dist) * step;
+                this.radius *= 0.995;
+                if (this.radius < 0.3) this.radius = 0.3;
+                this.phase = 'charging';
+            }
+
+            explode(origin, angle, speed) {
+                const a = angle + (Math.random() - 0.5) * 1.0;
+                const sp = speed * (0.6 + Math.random() * 0.8);
+                this.x = origin.x + (Math.random() - 0.5) * 6;
+                this.y = origin.y + (Math.random() - 0.5) * 6;
+                this.vx = Math.cos(a) * sp;
+                this.vy = Math.sin(a) * sp;
+                this.life = 30 + Math.random() * 30;
+                this.phase = 'exploding';
+                this.radius = 2 + Math.random() * 3;
+                this.color = `rgba(66,38,96,${0.4+Math.random()*0.3})`;
+            }
+
+            update() {
+                if (this.phase === 'exploding') {
+                    this.x += this.vx;
+                    this.y += this.vy;
+                    this.vx *= 0.96;
+                    this.vy *= 0.96;
+                    this.radius *= 0.98;
+                    this.life--;
+                    if (this.life <= 0 || this.radius < 0.2) this.active = false;
+                }
+            }
+
+            draw(ctx) {
+                if (!this.active) return;
+                ctx.save();
+                ctx.globalAlpha = 0.6;
+                ctx.fillStyle = this.color;
+                ctx.shadowColor = 'rgba(66,38,96,0.05)';
+                ctx.shadowBlur = 2;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        let particles = [];
+        for (let i = 0; i < 160; i++) particles.push(new Particle());
+
+        // ================================================================
+        //  5. 蓄力与伤害
+        // ================================================================
+        let chargeTime = 0,
+            isCharging = false,
+            isLocked = false;
+
+        function calcDamage(t) {
+            return CONFIG.baseDamage * Math.pow(CONFIG.rate, t);
+        }
+
+        // ================================================================
+        //  6. 子弹（低饱和能量弹）
+        // ================================================================
+        let bullets = [];
+
+        class Bullet {
+            constructor(origin, angle, damage) {
+                this.x = origin.x;
+                this.y = origin.y;
+                this.vx = Math.cos(angle) * CONFIG.bulletSpeed;
+                this.vy = Math.sin(angle) * CONFIG.bulletSpeed;
+                this.radius = 5 + damage * 0.08;
+                this.damage = damage;
+                this.life = 200;
+                this.active = true;
+                this.trail = [];
+            }
+
+            update() {
+                this.trail.push({ x: this.x, y: this.y });
+                if (this.trail.length > 12) this.trail.shift();
+                this.x += this.vx;
+                this.y += this.vy;
+                this.life--;
+                if (this.x < 0 || this.x > W || this.y < 0 || this.y > H || this.life <= 0) {
+                    this.active = false;
+                }
+            }
+
+            draw(ctx) {
+                for (let i = 0; i < this.trail.length; i++) {
+                    const alpha = (i / this.trail.length) * 0.3;
+                    ctx.beginPath();
+                    ctx.arc(this.trail[i].x, this.trail[i].y, this.radius * (i / this.trail.length) * 0.6, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(66,38,96,${alpha})`;
+                    ctx.fill();
+                }
+                ctx.save();
+                ctx.shadowColor = 'rgba(66,38,96,0.2)';
+                ctx.shadowBlur = 10;
+                ctx.fillStyle = '#705488';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        // ================================================================
+        //  7. 靶子（乾阳 · 红金低饱和）
+        // ================================================================
+        let targets = [];
+
+        class Target {
+            constructor(x, y) {
+                this.x = x || 140 + Math.random() * (W - 280);
+                this.y = y || 90 + Math.random() * (H - 180);
+                this.radius = 30;
+                this.hit = false;
+                this.hitTimer = 0;
+                this.active = true;
+                this.pulse = Math.random() * Math.PI * 2;
+            }
+
+            hitEffect() { this.hit = true;
+                this.hitTimer = 20; }
+
+            update() {
+                this.pulse += 0.03;
+                if (this.hit) {
+                    this.hitTimer--;
+                    if (this.hitTimer <= 0) this.active = false;
+                }
+            }
+
+            draw(ctx) {
+                if (!this.active) return;
+                const pulseOffset = Math.sin(this.pulse) * 2;
+                ctx.save();
+
+                ctx.strokeStyle = this.hit ? '#705488' : '#422660';
+                ctx.lineWidth = this.hit ? 4 : 2;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius + 2 + pulseOffset * 0.2, 0, Math.PI * 2);
+                ctx.stroke();
+
+                ctx.fillStyle = this.hit ? 'rgba(112,84,136,0.3)' : 'rgba(66,38,96,0.2)';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius * 0.5, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = this.hit ? '#705488' : '#422660';
+                ctx.font = '20px serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('☰', this.x, this.y + 1);
+
+                ctx.restore();
+            }
+        }
+
+        function initTargets() {
+            targets = [];
+            for (let i = 0; i < CONFIG.targetCount; i++) targets.push(new Target());
+        }
+        initTargets();
+
+        // ================================================================
+        //  8. 三阴爻（胸口联动已内嵌角色中）
+        // ================================================================
+
+        // ================================================================
+        //  9. UI 面板：左侧竖版爻构信息（硬边克制风格）
+        // ================================================================
+        function drawLeftPanel(ctx) {
+            const panel = {
+                x: 12,
+                y: 12,
+                w: 190,
+                h: 228,
+            };
+
+            ctx.save();
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = 'rgba(8, 6, 18, 0.85)';
+            ctx.strokeStyle = '#422660';
+            ctx.lineWidth = 1.2;
+
+            const r = 4;
+            const x = panel.x,
+                y = panel.y,
+                w = panel.w,
+                h = panel.h;
+            ctx.beginPath();
+            ctx.moveTo(x + r, y);
+            ctx.lineTo(x + w - r, y);
+            ctx.lineTo(x + w, y + r);
+            ctx.lineTo(x + w, y + h - r);
+            ctx.lineTo(x + w - r, y + h);
+            ctx.lineTo(x + r, y + h);
+            ctx.lineTo(x, y + h - r);
+            ctx.lineTo(x, y + r);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            const glow = player.glow || 0;
+            const yaoAlpha = 0.15 + glow * 0.85;
+
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'top';
+            ctx.font = '16px "Georgia", "SimSun", serif';
+            ctx.fillStyle = '#b8a08a';
+            ctx.fillText('坤 · 牛 ☷', panel.x + 12, panel.y + 12);
+
+            const yaoX = panel.x + 112,
+                yaoY = panel.y + 16,
+                yaoW = 14,
+                yaoGap = 4;
+            ctx.strokeStyle = `rgba(66, 38, 96, ${yaoAlpha})`;
+            ctx.lineWidth = 1.8;
+            for (let i = 0; i < 3; i++) {
+                const yy = yaoY + i * (yaoGap + 6);
+                ctx.beginPath();
+                ctx.moveTo(yaoX, yy);
+                ctx.lineTo(yaoX + yaoW, yy);
+                ctx.stroke();
+            }
+
+            const infoX = panel.x + 12,
+                infoY = panel.y + 48;
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'top';
+
+            ctx.font = '12px "Georgia", "SimSun", serif';
+            ctx.fillStyle = '#5a4a4a';
+            ctx.fillText('蓄力时长', infoX, infoY);
+            ctx.fillStyle = '#b8a08a';
+            ctx.font = '14px "Georgia", serif';
+            const t = chargeTime || 0;
+            ctx.fillText(`t = ${t.toFixed(1)} s`, infoX + 72, infoY);
+
+            const dmg = calcDamage(chargeTime);
+            ctx.fillStyle = '#5a4a4a';
+            ctx.font = '12px "Georgia", "SimSun", serif';
+            ctx.fillText('伤害倍率', infoX, infoY + 26);
+            ctx.fillStyle = '#b8a08a';
+            ctx.font = '14px "Georgia", serif';
+            ctx.fillText(`× ${dmg.toFixed(2)}`, infoX + 72, infoY + 26);
+
+            const estDamage = Math.floor(dmg * 1.0);
+            ctx.fillStyle = '#5a4a4a';
+            ctx.font = '12px "Georgia", "SimSun", serif';
+            ctx.fillText('预估伤害', infoX, infoY + 52);
+            ctx.fillStyle = '#b8a08a';
+            ctx.font = '14px "Georgia", serif';
+            ctx.fillText(`${estDamage}`, infoX + 72, infoY + 52);
+
+            const barX = infoX,
+                barY = infoY + 78,
+                barW = 166,
+                barH = 6;
+            ctx.fillStyle = 'rgba(66, 38, 96, 0.2)';
+            ctx.fillRect(barX, barY, barW, barH);
+
+            const progress = Math.min((chargeTime || 0) / CONFIG.maxChargeTime, 1);
+            if (progress > 0.01) {
+                const count = 12;
+                const time = Date.now() / 300;
+                for (let i = 0; i < count; i++) {
+                    const offset = (i / count + time * 0.02) % 1;
+                    const px = barX + offset * barW * progress;
+                    const py = barY + barH / 2 + Math.sin(offset * 12 + time) * 2;
+                    ctx.beginPath();
+                    ctx.arc(px, py, 1.6 + glow * 0.6, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(66, 38, 96, ${0.3 + 0.5 * (1 - offset)})`;
+                    ctx.fill();
+                }
+                ctx.fillStyle = `rgba(66, 38, 96, ${0.15 * progress})`;
+                ctx.fillRect(barX, barY, barW * progress, barH);
+            }
+
+            ctx.font = '12px "Georgia", "SimSun", serif';
+            ctx.fillStyle = '#5a4a4a';
+            ctx.fillText('当前状态', infoX, barY + 20);
+            const statusText = isCharging ? '蓄力中' : '待机';
+            ctx.fillStyle = isCharging ? '#705488' : '#5a4a4a';
+            ctx.font = '13px "Georgia", serif';
+            ctx.fillText(statusText, infoX + 72, barY + 18);
+
+            ctx.fillStyle = 'rgba(90, 74, 74, 0.4)';
+            ctx.font = '10px "Georgia", "SimSun", serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'bottom';
+            ctx.fillText('三阴 · 收敛蓄能 · 蓄力期间不可移动', panel.x + panel.w / 2, panel.y + panel.h - 8);
+
+            ctx.restore();
+        }
+
+        // ================================================================
+        //  10. 命中闪光（克制版）
+        // ================================================================
+        let flashAlpha = 0;
+
+        function triggerFlash() { flashAlpha = 0.3; }
+
+        // ================================================================
+        //  11. 鼠标与键盘
+        // ================================================================
+        let mouseX = player.x,
+            mouseY = player.y;
+        const keys = {};
+
+        document.addEventListener('keydown', (e) => {
+            keys[e.key.toLowerCase()] = true;
+            if (['w', 'a', 's', 'd'].includes(e.key.toLowerCase())) e.preventDefault();
+        });
+        document.addEventListener('keyup', (e) => { keys[e.key.toLowerCase()] = false; });
+
+        function handleMovement() {
+            if (isCharging || isLocked) return;
+            const speed = 3.2;
+            if (keys['w']) player.y -= speed;
+            if (keys['s']) player.y += speed;
+            if (keys['a']) player.x -= speed;
+            if (keys['d']) player.x += speed;
+            player.x = Math.max(50, Math.min(W - 50, player.x));
+            player.y = Math.max(60, Math.min(H - 60, player.y));
+        }
+
+        canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width,
+                scaleY = canvas.height / rect.height;
+            mouseX = (e.clientX - rect.left) * scaleX;
+            mouseY = (e.clientY - rect.top) * scaleY;
+        });
+
+        canvas.addEventListener('mousedown', (e) => {
+            if (e.button !== 0) return;
+            if (!isCharging) {
+                isCharging = true;
+                isLocked = true;
+                chargeTime = 0;
+                for (let p of particles) {
+                    if (p.phase !== 'exploding') {
+                        p.x = Math.random() * W;
+                        p.y = Math.random() * H;
+                        p.phase = 'idle';
+                    }
+                }
+            }
+        });
+
+        canvas.addEventListener('mouseup', (e) => {
+            if (e.button !== 0) return;
+            if (isCharging) {
+                const angle = Math.atan2(mouseY - player.y, mouseX - player.x);
+                const damage = calcDamage(chargeTime);
+                bullets.push(new Bullet({ x: player.x, y: player.y - 10 }, angle, damage));
+
+                for (let p of particles) {
+                    if (p.phase === 'charging' || p.phase === 'idle') {
+                        p.explode({ x: player.x, y: player.y - 10 }, angle + (Math.random() - 0.5) * 1.2, 3 + Math
+                            .random() * 5);
+                    }
+                }
+
+                isCharging = false;
+                isLocked = false;
+                chargeTime = 0;
+                while (particles.length < 160) particles.push(new Particle());
+                triggerFlash();
+            }
+        });
+
+        canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+        // ================================================================
+        //  12. 主循环
+        // ================================================================
+        function update() {
+            handleMovement();
+
+            if (isCharging) {
+                chargeTime += 1 / 60;
+                if (chargeTime > CONFIG.maxChargeTime) chargeTime = CONFIG.maxChargeTime;
+                const cx = player.x,
+                    cy = player.y;
+                for (let p of particles) p.converge(cx, cy);
+                player.glow = Math.min(chargeTime / 30, 1);
+            } else {
+                player.glow *= 0.95;
+                if (player.glow < 0.01) player.glow = 0;
+            }
+
+            for (let b of bullets) b.update();
+            bullets = bullets.filter(b => b.active);
+
+            for (let b of bullets) {
+                if (!b.active) continue;
+                for (let t of targets) {
+                    if (!t.active || t.hit) continue;
+                    const dx = b.x - t.x,
+                        dy = b.y - t.y;
+                    if (dx * dx + dy * dy < (b.radius + t.radius) ** 2) {
+                        t.hitEffect();
+                        b.active = false;
+                        triggerFlash();
+                        for (let i = 0; i < 25; i++) {
+                            const p = new Particle(t.x, t.y);
+                            p.explode({ x: t.x, y: t.y }, Math.random() * Math.PI * 2, 2 + Math.random() * 4);
+                            particles.push(p);
+                        }
+                        if (particles.length > 400) particles.splice(0, particles.length - 400);
+                        break;
+                    }
+                }
+            }
+
+            for (let t of targets) t.update();
+            targets = targets.filter(t => t.active);
+            while (targets.length < CONFIG.targetCount) targets.push(new Target());
+
+            for (let p of particles) { if (p.phase === 'exploding') p.update(); }
+            particles = particles.filter(p => p.active);
+
+            if (flashAlpha > 0) flashAlpha *= 0.92;
+            if (flashAlpha < 0.01) flashAlpha = 0;
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, W, H);
+
+            // 背景：极低饱和深色，与UI统一
+            const grad = ctx.createRadialGradient(W / 2, H / 2, 50, W / 2, H / 2, 400);
+            grad.addColorStop(0, '#120e1a');
+            grad.addColorStop(1, '#080612');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, W, H);
+
+            // 极淡星尘（克制）
+            ctx.fillStyle = 'rgba(66,38,96,0.04)';
+            for (let i = 0; i < 30; i++) {
+                ctx.beginPath();
+                ctx.arc((i * 37 + 13) % W, (i * 53 + 7) % H, 0.6 + (i % 3) * 0.4, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // 靶子
+            for (let t of targets) t.draw(ctx);
+
+            // 粒子
+            for (let p of particles) p.draw(ctx);
+
+            // 子弹
+            for (let b of bullets) b.draw(ctx);
+
+            // 角色（定稿，禁止修改）
+            player.draw(ctx);
+
+            // UI面板（最上层）
+            drawLeftPanel(ctx);
+
+            // 闪光
+            if (flashAlpha > 0) {
+                ctx.save();
+                ctx.fillStyle = `rgba(66,38,96,${flashAlpha * 0.15})`;
+                ctx.fillRect(0, 0, W, H);
+                ctx.restore();
+            }
+        }
+
+        function loop() {
+            update();
+            draw();
+            requestAnimationFrame(loop);
+        }
+
+        // ================================================================
+        //  13. 启动
+        // ================================================================
+        console.log('坤 · 牛 ☷ 厚德射覆 · 硬边克制版已启动');
+        console.log('WASD移动 | 左键蓄力 | 松开发射');
+        loop();
+    </script>
+</body>
+</html>
