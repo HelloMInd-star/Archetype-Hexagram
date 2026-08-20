@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>乾龙 · 天行连击</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: #0a080c;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Georgia', 'Times New Roman', serif;
+            color: #b8a08a;
+            padding: 20px;
+        }
+        .container {
+            background: #0a080c;
+            border-radius: 0;
+            padding: 8px;
+            border: 1px solid #1a2a3a;
+        }
+        canvas {
+            display: block;
+            width: 900px;
+            height: 640px;
+            border-radius: 0;
+            background: #080c12;
+            cursor: crosshair;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <canvas id="canvas" width="900" height="640"></canvas>
+    </div>
+    <script>
+        // ================================================================
+        //  1. 画布与上下文
+        // ================================================================
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const W = 900,
+            H = 640;
+
+        // ================================================================
+        //  2. 全局配置（青金 · 冷色系）
+        // ================================================================
+        const CONFIG = {
+            baseDamage: 8,
+            comboMultiplier: 0.3, // 每层连击增加 30% 伤害
+            maxCombo: 5,
+            bulletSpeed: 9,
+            targetCount: 5,
+        };
+
+        // ================================================================
+        //  3. 角色：乾 · 龙 ☰（矢量绘制—定稿）
+        // ================================================================
+        const player = {
+            x: 450,
+            y: 320,
+            scale: 1,
+            glow: 0, // 连击亮度，0~1
+            combo: 0, // 当前连击数
+            maxCombo: CONFIG.maxCombo,
+
+            draw: function(ctx) {
+                // ---------- 本段代码已定稿，禁止修改 ----------
+                const glow = this.glow || 0;
+                ctx.save();
+                ctx.translate(this.x, this.y);
+
+                // ========== 1. 主体躯干 + 四肢（上扬修长） ==========
+                ctx.beginPath();
+                ctx.moveTo(-24, -12);
+                ctx.lineTo(-32, 0);
+                ctx.lineTo(-28, 44);
+                ctx.lineTo(-20, 44);
+                ctx.lineTo(-22, 10);
+                ctx.lineTo(-16, 14);
+                ctx.lineTo(-40, 98);
+                ctx.lineTo(-28, 98);
+                ctx.lineTo(-24, 62);
+                ctx.lineTo(24, 62);
+                ctx.lineTo(28, 98);
+                ctx.lineTo(40, 98);
+                ctx.lineTo(16, 14);
+                ctx.lineTo(22, 10);
+                ctx.lineTo(20, 44);
+                ctx.lineTo(28, 44);
+                ctx.lineTo(32, 0);
+                ctx.lineTo(24, -12);
+                ctx.closePath();
+
+                ctx.fillStyle = "#0F0D1A";
+                ctx.fill();
+                ctx.strokeStyle = "#1E3A5F";
+                ctx.lineWidth = 2.2;
+                ctx.stroke();
+
+                // ========== 2. 龙首（上扬、锋利、带须） ==========
+                ctx.save();
+                ctx.translate(0, -14);
+                ctx.beginPath();
+                ctx.moveTo(-20, -52);
+                ctx.bezierCurveTo(-26, -38, -22, -18, -16, -12);
+                ctx.bezierCurveTo(-4, -6, 4, -6, 16, -12);
+                ctx.bezierCurveTo(22, -18, 26, -38, 20, -52);
+                ctx.bezierCurveTo(14, -60, 6, -64, 0, -64);
+                ctx.bezierCurveTo(-6, -64, -14, -60, -20, -52);
+                ctx.closePath();
+                ctx.fillStyle = "#0F0D1A";
+                ctx.fill();
+                ctx.strokeStyle = "#1E3A5F";
+                ctx.lineWidth = 2.2;
+                ctx.stroke();
+
+                // 龙角（上扬、尖锐、向后延伸）
+                ctx.beginPath();
+                ctx.moveTo(-16, -50);
+                ctx.bezierCurveTo(-24, -58, -28, -66, -26, -72);
+                ctx.moveTo(16, -50);
+                ctx.bezierCurveTo(24, -58, 28, -66, 26, -72);
+                ctx.lineWidth = 1.8;
+                ctx.strokeStyle = "#22D3EE";
+                ctx.stroke();
+
+                // 龙须（细线，两侧各两条）
+                ctx.lineWidth = 1.2;
+                ctx.strokeStyle = "#22D3EE";
+                ctx.beginPath();
+                ctx.moveTo(-18, -38);
+                ctx.bezierCurveTo(-26, -34, -32, -28, -34, -20);
+                ctx.moveTo(-14, -36);
+                ctx.bezierCurveTo(-20, -30, -24, -24, -24, -16);
+                ctx.moveTo(18, -38);
+                ctx.bezierCurveTo(26, -34, 32, -28, 34, -20);
+                ctx.moveTo(14, -36);
+                ctx.bezierCurveTo(20, -30, 24, -24, 24, -16);
+                ctx.stroke();
+
+                // 眼部（狭长、上扬、锐利）
+                ctx.strokeStyle = "#22D3EE";
+                ctx.lineWidth = 1.6;
+                ctx.beginPath();
+                ctx.moveTo(-10, -32);
+                ctx.lineTo(-4, -28);
+                ctx.moveTo(10, -32);
+                ctx.lineTo(4, -28);
+                ctx.stroke();
+
+                // 口鼻（短、收束）
+                ctx.strokeStyle = "#1E3A5F";
+                ctx.lineWidth = 1.2;
+                ctx.beginPath();
+                ctx.moveTo(-3, -24);
+                ctx.lineTo(3, -24);
+                ctx.stroke();
+
+                ctx.restore();
+
+                // ========== 3. 头顶三阳爻 ⚊⚊⚊ 随连击逐一点亮 ==========
+                ctx.save();
+                const yangBaseY = -68;
+                const yangW = 20;
+                const yangGap = 8;
+                const total = 3;
+                const comboRatio = Math.min(this.combo / total, 1);
+                const yangAlpha = 0.2 + comboRatio * 0.8;
+
+                ctx.strokeStyle = `rgba(34, 211, 238, ${yangAlpha})`;
+                ctx.lineWidth = 2.5;
+                ctx.shadowColor = `rgba(34, 211, 238, ${comboRatio * 0.3})`;
+                ctx.shadowBlur = comboRatio * 15;
+
+                for (let i = 0; i < total; i++) {
+                    const yy = yangBaseY + i * yangGap;
+                    const brightness = i < this.combo ? 1 : 0.15;
+                    ctx.strokeStyle = `rgba(34, 211, 238, ${0.15 + brightness * 0.85})`;
+                    ctx.beginPath();
+                    ctx.moveTo(-yangW / 2, yy);
+                    ctx.lineTo(yangW / 2, yy);
+                    ctx.stroke();
+                }
+                ctx.restore();
+
+                // ========== 4. 连击外轮廓光晕（随连击渐强） ==========
+                if (this.glow > 0) {
+                    ctx.save();
+                    ctx.shadowColor = "#22D3EE";
+                    ctx.shadowBlur = 1 + this.glow * 14;
+                    ctx.beginPath();
+                    ctx.moveTo(-24, -12);
+                    ctx.lineTo(-32, 0);
+                    ctx.lineTo(-28, 44);
+                    ctx.lineTo(-20, 44);
+                    ctx.lineTo(-22, 10);
+                    ctx.lineTo(-16, 14);
+                    ctx.lineTo(-40, 98);
+                    ctx.lineTo(-28, 98);
+                    ctx.lineTo(-24, 62);
+                    ctx.lineTo(24, 62);
+                    ctx.lineTo(28, 98);
+                    ctx.lineTo(40, 98);
+                    ctx.lineTo(16, 14);
+                    ctx.lineTo(22, 10);
+                    ctx.lineTo(20, 44);
+                    ctx.lineTo(28, 44);
+                    ctx.lineTo(32, 0);
+                    ctx.lineTo(24, -12);
+                    ctx.closePath();
+                    ctx.strokeStyle = `rgba(34, 211, 238, ${this.glow * 0.4})`;
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+                    ctx.restore();
+                }
+
+                ctx.restore();
+            }
+        };
+
+        // ================================================================
+        //  4. 粒子系统（环绕旋转 · 不收敛）
+        // ================================================================
+        class Particle {
+            constructor(x, y) {
+                this.x = x || Math.random() * W;
+                this.y = y || Math.random() * H;
+                this.radius = 1.2 + Math.random() * 2.2;
+                this.speed = 0.02 + Math.random() * 0.03;
+                this.angle = Math.random() * Math.PI * 2;
+                this.orbitRadius = 60 + Math.random() * 80;
+                this.phase = 'idle';
+                this.active = true;
+                this.vx = 0;
+                this.vy = 0;
+                this.life = 0;
+                const palettes = [
+                    `rgba(34,211,238,${0.2+Math.random()*0.3})`,
+                    `rgba(30,58,95,${0.2+Math.random()*0.3})`,
+                    `rgba(100,200,255,${0.15+Math.random()*0.25})`,
+                ];
+                this.color = palettes[Math.floor(Math.random() * palettes.length)];
+            }
+
+            // 乾龙粒子：环绕角色旋转
+            orbit(cx, cy, glow) {
+                this.angle += this.speed * (0.8 + glow * 0.4);
+                const r = this.orbitRadius * (0.7 + glow * 0.3);
+                this.x = cx + Math.cos(this.angle) * r;
+                this.y = cy + Math.sin(this.angle) * r * 0.6;
+                this.radius = 1.2 + glow * 1.2 + Math.sin(this.angle * 2) * 0.4;
+                this.phase = 'orbiting';
+            }
+
+            explode(origin, angle, speed) {
+                const a = angle + (Math.random() - 0.5) * 1.2;
+                const sp = speed * (0.5 + Math.random() * 0.8);
+                this.x = origin.x + (Math.random() - 0.5) * 6;
+                this.y = origin.y + (Math.random() - 0.5) * 6;
+                this.vx = Math.cos(a) * sp;
+                this.vy = Math.sin(a) * sp;
+                this.life = 25 + Math.random() * 30;
+                this.phase = 'exploding';
+                this.radius = 2 + Math.random() * 3.5;
+                this.color = `rgba(34,211,238,${0.4+Math.random()*0.3})`;
+            }
+
+            update() {
+                if (this.phase === 'exploding') {
+                    this.x += this.vx;
+                    this.y += this.vy;
+                    this.vx *= 0.95;
+                    this.vy *= 0.95;
+                    this.radius *= 0.98;
+                    this.life--;
+                    if (this.life <= 0 || this.radius < 0.2) this.active = false;
+                }
+            }
+
+            draw(ctx) {
+                if (!this.active) return;
+                ctx.save();
+                ctx.globalAlpha = 0.6;
+                ctx.fillStyle = this.color;
+                ctx.shadowColor = 'rgba(34,211,238,0.05)';
+                ctx.shadowBlur = 2;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        let particles = [];
+        for (let i = 0; i < 140; i++) particles.push(new Particle());
+
+        // ================================================================
+        //  5. 连击系统
+        // ================================================================
+        let comboCount = 0;
+        let isShooting = false; // 防止一次点击发射多次
+
+        function calcDamage(combo) {
+            return CONFIG.baseDamage * (1 + combo * CONFIG.comboMultiplier);
+        }
+
+        // ================================================================
+        //  6. 子弹（三角/菱形能量弹 · 锋利感）
+        // ================================================================
+        let bullets = [];
+
+        class Bullet {
+            constructor(origin, angle, damage, combo) {
+                this.x = origin.x;
+                this.y = origin.y;
+                this.vx = Math.cos(angle) * CONFIG.bulletSpeed;
+                this.vy = Math.sin(angle) * CONFIG.bulletSpeed;
+                this.radius = 5 + damage * 0.06;
+                this.damage = damage;
+                this.combo = combo;
+                this.life = 200;
+                this.active = true;
+                this.trail = [];
+                this.angle = angle;
+            }
+
+            update() {
+                this.trail.push({ x: this.x, y: this.y });
+                if (this.trail.length > 10) this.trail.shift();
+                this.x += this.vx;
+                this.y += this.vy;
+                this.life--;
+                if (this.x < 0 || this.x > W || this.y < 0 || this.y > H || this.life <= 0) {
+                    this.active = false;
+                }
+            }
+
+            draw(ctx) {
+                // 拖尾（青金）
+                for (let i = 0; i < this.trail.length; i++) {
+                    const alpha = (i / this.trail.length) * 0.25;
+                    const r = this.radius * (i / this.trail.length) * 0.5;
+                    ctx.beginPath();
+                    ctx.arc(this.trail[i].x, this.trail[i].y, r, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(34,211,238,${alpha})`;
+                    ctx.fill();
+                }
+
+                ctx.save();
+                // 三角/菱形子弹（锋利）
+                const size = this.radius + 2;
+                const angle = this.angle;
+                ctx.translate(this.x, this.y);
+                ctx.rotate(angle);
+                ctx.shadowColor = 'rgba(34,211,238,0.2)';
+                ctx.shadowBlur = 12;
+                ctx.fillStyle = '#22D3EE';
+                ctx.strokeStyle = '#1E3A5F';
+                ctx.lineWidth = 1.2;
+                ctx.beginPath();
+                ctx.moveTo(size, 0);
+                ctx.lineTo(0, size * 0.6);
+                ctx.lineTo(-size, 0);
+                ctx.lineTo(0, -size * 0.6);
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+
+                // 高光
+                ctx.shadowBlur = 0;
+                ctx.fillStyle = 'rgba(255,255,255,0.3)';
+                ctx.beginPath();
+                ctx.arc(size * 0.3, -size * 0.2, size * 0.2, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        // ================================================================
+        //  7. 靶子（乾阳 · 青金低饱和）
+        // ================================================================
+        let targets = [];
+
+        class Target {
+            constructor(x, y) {
+                this.x = x || 140 + Math.random() * (W - 280);
+                this.y = y || 90 + Math.random() * (H - 180);
+                this.radius = 30;
+                this.hit = false;
+                this.hitTimer = 0;
+                this.active = true;
+                this.pulse = Math.random() * Math.PI * 2;
+            }
+
+            hitEffect() { this.hit = true;
+                this.hitTimer = 20; }
+
+            update() {
+                this.pulse += 0.03;
+                if (this.hit) {
+                    this.hitTimer--;
+                    if (this.hitTimer <= 0) this.active = false;
+                }
+            }
+
+            draw(ctx) {
+                if (!this.active) return;
+                const pulseOffset = Math.sin(this.pulse) * 2;
+                ctx.save();
+
+                ctx.strokeStyle = this.hit ? '#22D3EE' : '#1E3A5F';
+                ctx.lineWidth = this.hit ? 4 : 2;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius + 2 + pulseOffset * 0.2, 0, Math.PI * 2);
+                ctx.stroke();
+
+                ctx.fillStyle = this.hit ? 'rgba(34,211,238,0.2)' : 'rgba(30,58,95,0.2)';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius * 0.5, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = this.hit ? '#22D3EE' : '#1E3A5F';
+                ctx.font = '20px serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('☰', this.x, this.y + 1);
+
+                ctx.restore();
+            }
+        }
+
+        function initTargets() {
+            targets = [];
+            for (let i = 0; i < CONFIG.targetCount; i++) targets.push(new Target());
+        }
+        initTargets();
+
+        // ================================================================
+        //  8. 三阳爻（头顶联动已内嵌角色中）
+        // ================================================================
+
+        // ================================================================
+        //  9. UI 面板：左侧竖版连击信息（青金风格）
+        // ================================================================
+        function drawLeftPanel(ctx) {
+            const panel = {
+                x: 12,
+                y: 12,
+                w: 190,
+                h: 228,
+            };
+
+            ctx.save();
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = 'rgba(8, 6, 18, 0.85)';
+            ctx.strokeStyle = '#1E3A5F';
+            ctx.lineWidth = 1.2;
+
+            const r = 4;
+            const x = panel.x,
+                y = panel.y,
+                w = panel.w,
+                h = panel.h;
+            ctx.beginPath();
+            ctx.moveTo(x + r, y);
+            ctx.lineTo(x + w - r, y);
+            ctx.lineTo(x + w, y + r);
+            ctx.lineTo(x + w, y + h - r);
+            ctx.lineTo(x + w - r, y + h);
+            ctx.lineTo(x + r, y + h);
+            ctx.lineTo(x, y + h - r);
+            ctx.lineTo(x, y + r);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            const glow = player.glow || 0;
+            const combo = player.combo || 0;
+            const maxCombo = player.maxCombo || 5;
+            const yangAlpha = 0.15 + glow * 0.85;
+
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'top';
+            ctx.font = '16px "Georgia", "SimSun", serif';
+            ctx.fillStyle = '#8ab0b8';
+            ctx.fillText('乾 · 龙 ☰', panel.x + 12, panel.y + 12);
+
+            // 并排三阳爻（头顶联动）
+            const yaoX = panel.x + 112,
+                yaoY = panel.y + 16,
+                yaoW = 14,
+                yaoGap = 4;
+            for (let i = 0; i < 3; i++) {
+                const yy = yaoY + i * (yaoGap + 6);
+                const brightness = i < combo ? 1 : 0.15;
+                ctx.strokeStyle = `rgba(34, 211, 238, ${0.15 + brightness * 0.85})`;
+                ctx.lineWidth = 1.8;
+                ctx.beginPath();
+                ctx.moveTo(yaoX, yy);
+                ctx.lineTo(yaoX + yaoW, yy);
+                ctx.stroke();
+            }
+
+            const infoX = panel.x + 12,
+                infoY = panel.y + 48;
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'top';
+
+            // 连击数
+            ctx.font = '12px "Georgia", "SimSun", serif';
+            ctx.fillStyle = '#4a6a72';
+            ctx.fillText('连击数', infoX, infoY);
+            ctx.fillStyle = '#8ab0b8';
+            ctx.font = '18px "Georgia", serif';
+            ctx.fillText(`${combo}`, infoX + 72, infoY - 2);
+
+            // 伤害倍率
+            const dmg = calcDamage(combo);
+            ctx.fillStyle = '#4a6a72';
+            ctx.font = '12px "Georgia", "SimSun", serif';
+            ctx.fillText('伤害倍率', infoX, infoY + 28);
+            ctx.fillStyle = '#8ab0b8';
+            ctx.font = '14px "Georgia", serif';
+            ctx.fillText(`× ${dmg.toFixed(1)}`, infoX + 72, infoY + 26);
+
+            // 预估伤害
+            const estDamage = Math.floor(dmg);
+            ctx.fillStyle = '#4a6a72';
+            ctx.font = '12px "Georgia", "SimSun", serif';
+            ctx.fillText('预估伤害', infoX, infoY + 54);
+            ctx.fillStyle = '#8ab0b8';
+            ctx.font = '14px "Georgia", serif';
+            ctx.fillText(`${estDamage}`, infoX + 72, infoY + 52);
+
+            // 连击进度条
+            const barX = infoX,
+                barY = infoY + 80,
+                barW = 166,
+                barH = 6;
+            ctx.fillStyle = 'rgba(30,58,95,0.2)';
+            ctx.fillRect(barX, barY, barW, barH);
+
+            const progress = Math.min(combo / maxCombo, 1);
+            if (progress > 0.01) {
+                // 粒子流进度条
+                const count = 12;
+                const time = Date.now() / 300;
+                for (let i = 0; i < count; i++) {
+                    const offset = (i / count + time * 0.02) % 1;
+                    const px = barX + offset * barW * progress;
+                    const py = barY + barH / 2 + Math.sin(offset * 12 + time) * 2;
+                    ctx.beginPath();
+                    ctx.arc(px, py, 1.6 + glow * 0.6, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(34, 211, 238, ${0.2 + 0.5 * (1 - offset)})`;
+                    ctx.fill();
+                }
+                ctx.fillStyle = `rgba(34, 211, 238, ${0.1 * progress})`;
+                ctx.fillRect(barX, barY, barW * progress, barH);
+            }
+
+            // 状态
+            ctx.font = '12px "Georgia", "SimSun", serif';
+            ctx.fillStyle = '#4a6a72';
+            ctx.fillText('连击状态', infoX, barY + 20);
+            const statusText = combo > 0 ? `连击中 ${combo}` : '待机';
+            ctx.fillStyle = combo > 0 ? '#22D3EE' : '#4a6a72';
+            ctx.font = '13px "Georgia", serif';
+            ctx.fillText(statusText, infoX + 72, barY + 18);
+
+            // 底部提示
+            ctx.fillStyle = 'rgba(74, 106, 114, 0.4)';
+            ctx.font = '10px "Georgia", "SimSun", serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'bottom';
+            ctx.fillText('三阳 · 连击叠伤 · 未命中则中断', panel.x + panel.w / 2, panel.y + panel.h - 8);
+
+            ctx.restore();
+        }
+
+        // ================================================================
+        //  10. 命中闪光（青金版）
+        // ================================================================
+        let flashAlpha = 0;
+
+        function triggerFlash() { flashAlpha = 0.3; }
+
+        // ================================================================
+        //  11. 鼠标与键盘
+        // ================================================================
+        let mouseX = player.x,
+            mouseY = player.y;
+        const keys = {};
+
+        document.addEventListener('keydown', (e) => {
+            keys[e.key.toLowerCase()] = true;
+            if (['w', 'a', 's', 'd'].includes(e.key.toLowerCase())) e.preventDefault();
+        });
+        document.addEventListener('keyup', (e) => { keys[e.key.toLowerCase()] = false; });
+
+        function handleMovement() {
+            const speed = 3.2;
+            if (keys['w']) player.y -= speed;
+            if (keys['s']) player.y += speed;
+            if (keys['a']) player.x -= speed;
+            if (keys['d']) player.x += speed;
+            player.x = Math.max(50, Math.min(W - 50, player.x));
+            player.y = Math.max(60, Math.min(H - 60, player.y));
+        }
+
+        canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width,
+                scaleY = canvas.height / rect.height;
+            mouseX = (e.clientX - rect.left) * scaleX;
+            mouseY = (e.clientY - rect.top) * scaleY;
+        });
+
+        // 鼠标左键点击 → 发射阳爻弹
+        canvas.addEventListener('mousedown', (e) => {
+            if (e.button !== 0) return;
+            if (isShooting) return;
+            isShooting = true;
+
+            const angle = Math.atan2(mouseY - player.y, mouseX - player.x);
+            const damage = calcDamage(comboCount);
+            const bullet = new Bullet({ x: player.x, y: player.y - 10 }, angle, damage, comboCount);
+            bullets.push(bullet);
+
+            // 发射粒子爆散
+            for (let p of particles) {
+                if (p.phase !== 'exploding') {
+                    p.explode({ x: player.x, y: player.y - 10 }, angle + (Math.random() - 0.5) * 1.0, 3 + Math.random() *
+                    4);
+                }
+            }
+
+            // 先假设未命中，命中后在碰撞检测里增加 combo
+            // 这里先不重置 combo，等碰撞判定
+            setTimeout(() => { isShooting = false; }, 80);
+        });
+
+        canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+        // ================================================================
+        //  12. 主循环
+        // ================================================================
+        function update() {
+            handleMovement();
+
+            // 更新粒子环绕（乾龙：环绕旋转）
+            const cx = player.x,
+                cy = player.y;
+            const glow = player.glow || 0;
+            for (let p of particles) {
+                if (p.phase !== 'exploding') {
+                    p.orbit(cx, cy, glow);
+                }
+            }
+            // 清理爆炸粒子
+            for (let p of particles) { if (p.phase === 'exploding') p.update(); }
+            particles = particles.filter(p => p.active);
+
+            // 更新子弹
+            for (let b of bullets) b.update();
+            bullets = bullets.filter(b => b.active);
+
+            // 碰撞检测：子弹 vs 靶子
+            for (let b of bullets) {
+                if (!b.active) continue;
+                for (let t of targets) {
+                    if (!t.active || t.hit) continue;
+                    const dx = b.x - t.x,
+                        dy = b.y - t.y;
+                    if (dx * dx + dy * dy < (b.radius + t.radius) ** 2) {
+                        t.hitEffect();
+                        b.active = false;
+                        // ✅ 命中：连击+1
+                        comboCount = Math.min(comboCount + 1, CONFIG.maxCombo);
+                        player.combo = comboCount;
+                        player.glow = Math.min(comboCount / 3, 1);
+                        triggerFlash();
+
+                        // 命中爆炸粒子
+                        for (let i = 0; i < 25; i++) {
+                            const p = new Particle(t.x, t.y);
+                            p.explode({ x: t.x, y: t.y }, Math.random() * Math.PI * 2, 2 + Math.random() * 4);
+                            particles.push(p);
+                        }
+                        if (particles.length > 400) particles.splice(0, particles.length - 400);
+                        break;
+                    }
+                }
+            }
+
+            // 更新靶子
+            for (let t of targets) t.update();
+            targets = targets.filter(t => t.active);
+            while (targets.length < CONFIG.targetCount) targets.push(new Target());
+
+            // 闪光衰减
+            if (flashAlpha > 0) flashAlpha *= 0.92;
+            if (flashAlpha < 0.01) flashAlpha = 0;
+
+            // 补充粒子
+            while (particles.length < 140) particles.push(new Particle());
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, W, H);
+
+            // 背景：深空蓝黑
+            const grad = ctx.createRadialGradient(W / 2, H / 2, 50, W / 2, H / 2, 400);
+            grad.addColorStop(0, '#0e1a24');
+            grad.addColorStop(1, '#080c12');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, W, H);
+
+            // 极淡星尘
+            ctx.fillStyle = 'rgba(34,211,238,0.03)';
+            for (let i = 0; i < 30; i++) {
+                ctx.beginPath();
+                ctx.arc((i * 37 + 13) % W, (i * 53 + 7) % H, 0.6 + (i % 3) * 0.4, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // 靶子
+            for (let t of targets) t.draw(ctx);
+
+            // 粒子
+            for (let p of particles) p.draw(ctx);
+
+            // 子弹
+            for (let b of bullets) b.draw(ctx);
+
+            // 角色
+            player.draw(ctx);
+
+            // UI面板
+            drawLeftPanel(ctx);
+
+            // 闪光
+            if (flashAlpha > 0) {
+                ctx.save();
+                ctx.fillStyle = `rgba(34,211,238,${flashAlpha * 0.12})`;
+                ctx.fillRect(0, 0, W, H);
+                ctx.restore();
+            }
+        }
+
+        function loop() {
+            update();
+            draw();
+            requestAnimationFrame(loop);
+        }
+
+        // ================================================================
+        //  13. 启动
+        // ================================================================
+        console.log('乾 · 龙 ☰ 天行连击已启动');
+        console.log('WASD移动 | 左键连击发射 | 命中叠加连击');
+        loop();
+    </script>
+</body>
+</html>
