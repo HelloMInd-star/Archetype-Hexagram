@@ -55,6 +55,7 @@
 git clone https://github.com/HelloMInd-star/Archetype-Hexagram.git
 cd Archetype-Hexagram
 # 直接打开 index.html 即可运行
+```
 
 🧩 扩展指南
 添加新原型只需在 index.html 中替换：
